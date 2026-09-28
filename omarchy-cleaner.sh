@@ -548,6 +548,7 @@ item_description() {
         package:docker)              description="Container engine for running apps in containers" ;;
         package:docker-buildx)       description="Docker plugin for building container images" ;;
         package:docker-compose)      description="Runs multi-container Docker setups" ;;
+        package:ufw-docker)          description="Stops Docker bypassing the UFW firewall" ;;
         package:gpu-screen-recorder) description="Powers Omarchy's screen recording" ;;
         package:1password-beta)      description="1Password password manager" ;;
         package:1password-cli)       description="1Password command-line tool" ;;
@@ -1075,6 +1076,73 @@ enhanced_select_packages() {
     return 0
 }
 
+# pacman refuses the whole transaction when an installed package still needs a
+# selected one (ufw-docker needs docker). A dry run finds those without root.
+# Prints "package<TAB>dependent" per conflict.
+find_removal_blockers() {
+    local line pattern="^:: removing (.+) breaks dependency '.+' required by (.+)$"
+    while IFS= read -r line; do
+        if [[ "$line" =~ $pattern ]]; then
+            printf '%s\t%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+        fi
+    done < <(LC_ALL=C pacman -Rs --print -- "$@" 2>&1)
+}
+
+# Settle conflicts before confirmation: offer to remove the dependents too, or
+# keep the packages they need. Omarchy's own packages are never offered.
+# Sets RESOLVED_PACKAGES.
+resolve_package_blockers() {
+    RESOLVED_PACKAGES=("$@")
+    local -a conflicts dependents kept
+    local conflict package dependent
+    while [[ ${#RESOLVED_PACKAGES[@]} -gt 0 ]]; do
+        readarray -t conflicts < <(find_removal_blockers "${RESOLVED_PACKAGES[@]}")
+        [[ ${#conflicts[@]} -gt 0 ]] || return 0
+
+        # Packages Omarchy needs stay, without asking.
+        kept=()
+        for conflict in "${conflicts[@]}"; do
+            IFS=$'\t' read -r package dependent <<< "$conflict"
+            if [[ "$dependent" == omarchy || "$dependent" == omarchy-* ]]; then
+                kept+=("$package")
+                gum log --level warn "Keeping $package: Omarchy needs it ($dependent)"
+            fi
+        done
+        if [[ ${#kept[@]} -eq 0 ]]; then
+            clear
+            gum style --foreground 214 --bold "Some selected packages are needed by other installed packages:"
+            echo ""
+            dependents=()
+            for conflict in "${conflicts[@]}"; do
+                IFS=$'\t' read -r package dependent <<< "$conflict"
+                local description
+                description=$(item_description package "$dependent")
+                gum style --foreground 214 "   • $package is needed by $dependent${description:+ — $description}"
+                [[ " ${dependents[*]} " == *" $dependent "* ]] || dependents+=("$dependent")
+            done
+            echo ""
+            gum style --foreground 240 --italic "pacman removes all selected packages or none, so this must be settled first."
+            echo ""
+            if gum confirm --default=false --affirmative "Remove them too" --negative "Keep" \
+                "Also remove ${dependents[*]}?"; then
+                RESOLVED_PACKAGES+=("${dependents[@]}")
+                continue
+            fi
+            for conflict in "${conflicts[@]}"; do
+                IFS=$'\t' read -r package dependent <<< "$conflict"
+                kept+=("$package")
+                gum log --level info "Keeping $package (needed by $dependent)"
+            done
+        fi
+
+        local -a remaining=()
+        for package in "${RESOLVED_PACKAGES[@]}"; do
+            [[ " ${kept[*]} " == *" $package "* ]] || remaining+=("$package")
+        done
+        RESOLVED_PACKAGES=("${remaining[@]}")
+    done
+}
+
 # Packages are removed together so selected dependencies (e.g. docker-buildx
 # and docker) do not prevent each other from being removed in the wrong order.
 remove_packages() {
@@ -1297,6 +1365,11 @@ main() {
         readarray -t npmclis_array <<< "$selected_npmcli_lines"
     fi
     
+    if [[ ${#packages_array[@]} -gt 0 ]]; then
+        resolve_package_blockers "${packages_array[@]}"
+        packages_array=("${RESOLVED_PACKAGES[@]}")
+    fi
+
     # Check if any selected items have keyboard shortcuts (user file and/or
     # packaged Omarchy 4 defaults).
     local selected_items_have_bindings=false

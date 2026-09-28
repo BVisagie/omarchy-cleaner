@@ -37,6 +37,15 @@ elif name == 'sudo':
 elif name == 'pacman':
     if args[0] == '-Qi':
         sys.exit(0 if args[1] in os.environ.get('INSTALLED_PACKAGES', '').split() else 1)
+    if '--print' in args:
+        targets = [arg for arg in args[1:] if not arg.startswith('-')]
+        broken = False
+        for pair in os.environ.get('REQUIRED_BY', '').split():
+            package, dependent = pair.split(':')
+            if package in targets and dependent not in targets:
+                print(f":: removing {package} breaks dependency '{package}' required by {dependent}")
+                broken = True
+        sys.exit(1 if broken else 0)
     sys.exit(int(os.environ.get('PACMAN_RESULT', '0')))
 elif name in ('omarchy-webapp-remove', 'omarchy-tui-remove'):
     result = int(os.environ.get('HELPER_RESULT', '0'))
@@ -320,6 +329,23 @@ class CleanerTests(unittest.TestCase):
         self.assertEqual(self.calls('pacman'), [['pacman', '-Rns', '--noconfirm', '--',
                                                 'docker', 'docker-buildx', 'docker-compose']])
 
+    def test_blocked_package_removed_with_dependent_when_confirmed(self):
+        output = self.run_bash('resolve_package_blockers docker kdenlive; echo "RESULT<${RESOLVED_PACKAGES[*]}>"',
+                               REQUIRED_BY='docker:ufw-docker', CONFIRM_RESULT='0')
+        self.assertIn('docker is needed by ufw-docker', output)
+        self.assertIn('RESULT<docker kdenlive ufw-docker>', output)
+
+    def test_blocked_package_kept_when_declined(self):
+        output = self.run_bash('resolve_package_blockers docker kdenlive; echo "RESULT<${RESOLVED_PACKAGES[*]}>"',
+                               REQUIRED_BY='docker:ufw-docker docker-compose:my-stack')
+        self.assertIn('RESULT<kdenlive>', output)
+
+    def test_package_omarchy_needs_is_kept_without_asking(self):
+        output = self.run_bash('resolve_package_blockers gum kdenlive; echo "RESULT<${RESOLVED_PACKAGES[*]}>"',
+                               REQUIRED_BY='gum:omarchy', CONFIRM_RESULT='0')
+        self.assertIn('RESULT<kdenlive>', output)
+        self.assertFalse([call for call in self.calls('gum') if call[1] == 'confirm'])
+
     def test_sudo_failure_counts_every_package(self):
         output = self.run_bash('REMOVE_BINDINGS=true; remove_items obsidian omawrite', expected=2, SUDO_RESULT='1')
         self.assertIn('❌ FAILED', output)
@@ -402,7 +428,7 @@ class CleanerTests(unittest.TestCase):
         self.assertIn('CONFIRMATION REQUIRED', output)
         self.assertIn('• opencode — Open source AI coding agent', output)
         self.assertFalse(self.calls('sudo'))
-        self.assertTrue(all(call[1] == '-Qi' for call in self.calls('pacman')))
+        self.assertTrue(all(call[1] == '-Qi' or '--print' in call for call in self.calls('pacman')))
         self.assertEqual(self.bindings.read_text(), '')
 
     def test_selector_cancellation_has_no_mutations(self):

@@ -20,7 +20,7 @@ Omarchy 4 (Quattro) is supported alongside older installations. Shortcut cleanup
 
 Items marked **shortcut only** have a packaged shortcut but no desktop launcher. They are skipped if you decline shortcut cleanup. CLI removal deletes only recognized Omarchy wrappers in `~/.local/bin`; installed mise/npm runtimes, caches, and application data remain. Customized wrappers and symlinks are left alone.
 
-Packages are removed in one `pacman -Rns` transaction, including unused dependencies and package backup configs. Only this step uses sudo; the script runs as your normal user.
+Packages are removed in one `pacman -Rns` transaction, including unused dependencies and package backup configs. pacman removes all of them or none, so a dry run happens first. If another installed package still needs a selection (Omarchy's `ufw-docker` needs `docker`), you choose whether to remove it too or keep the selection; packages Omarchy itself needs are always kept. Only this step uses sudo; the script runs as your normal user.
 
 ## Customization
 

@@ -66,10 +66,16 @@ enhanced_select_packages   The gum fuzzy multi-select. Items arrive in one array
 remove_webapps          Removes one selected webapp/TUI launcher with its helper;
                         shortcut-only selections require cleanup consent.
 remove_npm_clis         Rechecks ownership and deletes selected stubs (no sudo).
+find_removal_blockers   Dry-runs `pacman -Rs --print` (no root) and reports each
+                        selected package another installed package still needs.
+resolve_package_blockers  Before confirmation, offers to remove those dependents
+                        too (ufw-docker for docker) or keeps the needed package.
+                        Never offers omarchy/omarchy-* packages.
 remove_packages         Acquires sudo, removes selected packages in one transaction.
 remove_items            parse_sections, all three removers, then binding cleanup
                         only for successful removals, followed by the hero box.
-main                    Banner → scan → select → keybind prompt → confirm → remove.
+main                    Banner → scan → select → dependency check → keybind prompt
+                        → confirm → remove.
 ```
 
 Runtime code is self-contained in this file. Regression tests live in `tests/`
