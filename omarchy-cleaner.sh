@@ -524,6 +524,87 @@ app_tokens_for() {
     esac
 }
 
+# One-line description shown beside each item, to help decide what to remove.
+# Mention Omarchy features that stop working without the item. Packages without
+# an entry fall back to pacman's own description.
+item_description() {
+    local type="$1" name="$2" description=""
+    case "$type:$name" in
+        package:aether)              description="Theme maker that builds themes from wallpapers" ;;
+        package:cliamp)              description="Winamp-style music player for the terminal" ;;
+        package:kdenlive)            description="Video editor" ;;
+        package:libreoffice-fresh)   description="Office suite: documents, spreadsheets, slides" ;;
+        package:xournalpp)           description="Handwritten notes and PDF annotation" ;;
+        package:pinta)               description="Simple image editor, similar to Paint.NET" ;;
+        package:obsidian)            description="Markdown notes and knowledge base" ;;
+        package:obs-studio)          description="Screen recording and live streaming studio" ;;
+        package:moonlight-qt)        description="Game streaming client for Sunshine/GameStream" ;;
+        package:lazydocker)          description="Terminal dashboard for Docker containers" ;;
+        package:omacut)              description="Omarchy's simple video trimmer" ;;
+        package:omacalc)             description="Omarchy's simple calculator" ;;
+        package:omawrite)            description="Omarchy's simple Markdown writing app" ;;
+        package:localsend)           description="AirDrop-style sharing; used by the Share menu" ;;
+        package:chromium)            description="Browser that runs webapps unless Brave/Chrome is default" ;;
+        package:docker)              description="Container engine for running apps in containers" ;;
+        package:docker-buildx)       description="Docker plugin for building container images" ;;
+        package:docker-compose)      description="Runs multi-container Docker setups" ;;
+        package:gpu-screen-recorder) description="Powers Omarchy's screen recording" ;;
+        package:1password-beta)      description="1Password password manager" ;;
+        package:1password-cli)       description="1Password command-line tool" ;;
+        package:signal-desktop)      description="Signal private messenger" ;;
+        package:spotify)             description="Spotify music streaming" ;;
+        package:typora)              description="Markdown editor" ;;
+        package:claude-code)         description="Anthropic's Claude Code AI coding agent" ;;
+        package:opencode)            description="Open source AI coding agent" ;;
+        package:ghostty)             description="Terminal emulator (default before foot)" ;;
+        package:alacritty)           description="Terminal emulator (default before foot)" ;;
+
+        webapp:HEY)                  description="HEY email; handles mailto links" ;;
+        webapp:Basecamp)             description="Basecamp project management" ;;
+        webapp:WhatsApp)             description="WhatsApp messaging" ;;
+        webapp:"Google Photos")      description="Google's photo library and backup" ;;
+        webapp:"Google Contacts")    description="Google's address book" ;;
+        webapp:"Google Messages")    description="Text your phone's SMS/RCS contacts" ;;
+        webapp:"Google Maps")        description="Maps and directions" ;;
+        webapp:YouTube)              description="YouTube video" ;;
+        webapp:X)                    description="X (Twitter) social network" ;;
+        webapp:Zoom)                 description="Zoom video meetings; opens Zoom links" ;;
+        webapp:Discord)              description="Discord chat and voice communities" ;;
+        webapp:Grok)                 description="xAI's Grok chatbot" ;;
+        webapp:ChatGPT)              description="OpenAI's ChatGPT chatbot" ;;
+        webapp:GitHub)               description="GitHub code hosting" ;;
+        webapp:Figma)                description="Figma interface design" ;;
+        webapp:Fizzy)                description="Fizzy kanban boards by 37signals" ;;
+        webapp:Docker)               description="Terminal dashboard for Docker (lazydocker)" ;;
+        webapp:"Disk Usage")         description="Shows what is filling your disk (dua)" ;;
+
+        npmcli:codex)                description="OpenAI's Codex AI coding agent" ;;
+        npmcli:claude)               description="Anthropic's Claude Code AI coding agent" ;;
+        npmcli:crush)                description="Charm's AI coding agent" ;;
+        npmcli:gemini)               description="Google's Gemini AI coding agent" ;;
+        npmcli:gh)                   description="GitHub command-line tool" ;;
+        npmcli:copilot)              description="GitHub Copilot AI coding agent" ;;
+        npmcli:opencode)             description="Open source AI coding agent" ;;
+        npmcli:playwright)           description="Browser automation and testing" ;;
+        npmcli:playwright-cli)       description="Browser automation and testing" ;;
+        npmcli:pi)                   description="Pi, a minimal AI coding agent" ;;
+        npmcli:omp)                  description="Oh My Pi, an extended Pi coding agent" ;;
+        npmcli:grok)                 description="xAI's Grok AI agent" ;;
+        npmcli:cursor-agent)         description="Cursor's AI coding agent" ;;
+        npmcli:ghui)                 description="GitHub pull requests and issues in the terminal" ;;
+        npmcli:hunk)                 description="Terminal diff viewer for reviewing AI changes" ;;
+        npmcli:muse)                 description="Meta's Muse AI coding agent" ;;
+        npmcli:hermes)               description="Nous Research's Hermes AI agent" ;;
+        npmcli:agy)                  description="Google's Antigravity AI coding agent" ;;
+        npmcli:hey)                  description="HEY email from the terminal" ;;
+        npmcli:ori)                  description="OpenRouter's Ori AI agent" ;;
+    esac
+    if [[ -z "$description" && "$type" == package ]]; then
+        description=$(LC_ALL=C pacman -Qi -- "$name" 2>/dev/null | sed -n 's/^Description *: //p')
+    fi
+    printf '%s\n' "$description"
+}
+
 # A line-oriented matcher cannot safely interpret mixed Lua string expressions.
 # Decline user-line deletion for ambiguous long-string layouts anywhere in a file.
 # Default unbinds can still be prepended without changing that file's own lines.
@@ -821,33 +902,37 @@ enhanced_select_packages() {
         item_types+=("npmcli")
     done
 
-    # Build display items with type indicators and binding markers
+    # Pad names to one column so shortcut markers and descriptions line up.
+    local name_width=0
+    for item in "${all_items[@]}"; do
+        [[ ${#item} -gt $name_width ]] && name_width=${#item}
+    done
+
+    # Build display items with type indicators, binding markers and descriptions
     for i in "${!all_items[@]}"; do
         local prefix=""
         case "${item_types[$i]}" in
             webapp) prefix="🌐 " ;;
-            npmcli) prefix="⬢ " ;;
+            npmcli) prefix="⬢  " ;;  # Emoji prefixes are two columns wide.
             *)      prefix="📦 " ;;
         esac
 
         # Check if this item has keyboard bindings (CLI stubs have none)
-        local suffix=""
-        if [[ "${item_types[$i]}" == webapp ]] && ! is_webapp_installed "${all_items[$i]}"; then
-            suffix=" (shortcut only)"
-        fi
-        local item_bindings=""
-        if [[ "${item_types[$i]}" != "npmcli" ]]; then
-            if item_has_bindings "${all_items[$i]}"; then
-                item_bindings="yes"
-            fi
-        fi
-        if [[ -n "$item_bindings" ]]; then
+        local marker=" "
+        bindings_found[i]=0
+        if [[ "${item_types[$i]}" != "npmcli" ]] && item_has_bindings "${all_items[$i]}"; then
+            marker="⌨"
             bindings_found[i]=1
-            display_items+=("${prefix}${all_items[$i]}${suffix} ⌨")
-        else
-            bindings_found[i]=0
-            display_items+=("${prefix}${all_items[$i]}${suffix}")
         fi
+        local description
+        description=$(item_description "${item_types[$i]}" "${all_items[$i]}")
+        if [[ "${item_types[$i]}" == webapp ]] && ! is_webapp_installed "${all_items[$i]}"; then
+            description="${description:+$description }(shortcut only)"
+        fi
+        local row
+        printf -v row '%s%-*s %s  %s' "$prefix" "$name_width" "${all_items[$i]}" "$marker" "$description"
+        # Selections are matched against the exact row, so drop trailing padding.
+        display_items+=("${row%"${row##*[![:space:]]}"}")
     done
     
     # Check if any items have bindings
@@ -1369,9 +1454,11 @@ main() {
             "📦 Packages (${#packages_array[@]}):"
         
         for pkg in "${packages_array[@]}"; do
+            local description
+            description=$(item_description package "$pkg")
             gum style \
                 --foreground 214 \
-                "   • $pkg"
+                "   • $pkg${description:+ — $description}"
         done
         echo ""
     fi
@@ -1384,9 +1471,10 @@ main() {
             "🌐 Webapps / TUIs (${#webapps_array[@]}):"
 
         for webapp in "${webapps_array[@]}"; do
-            local label="$webapp"
+            local label="$webapp" description
             is_webapp_installed "$webapp" || label="$webapp (shortcut only)"
-            gum style --foreground 214 "   • $label"
+            description=$(item_description webapp "$webapp")
+            gum style --foreground 214 "   • $label${description:+ — $description}"
         done
         echo ""
     fi
@@ -1399,9 +1487,11 @@ main() {
             "⬢ CLI wrappers (${#npmclis_array[@]}):"
 
         for cli in "${npmclis_array[@]}"; do
+            local description
+            description=$(item_description npmcli "$cli")
             gum style \
                 --foreground 214 \
-                "   • $cli"
+                "   • $cli${description:+ — $description}"
         done
         echo ""
     fi

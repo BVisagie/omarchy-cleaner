@@ -14,7 +14,7 @@ curl -fsSL https://raw.githubusercontent.com/maxart/omarchy-cleaner/main/omarchy
 
 ## How It Works
 
-The script scans for Omarchy's default **packages**, **desktop launchers (webapps and TUIs)**, and **CLI wrappers**, then lets you choose what to remove. Nothing is preselected, and an itemized confirmation comes before removal.
+The script scans for Omarchy's default **packages**, **desktop launchers (webapps and TUIs)**, and **CLI wrappers**, then lets you choose what to remove. Each item has a short description of what it is, and notes when an Omarchy feature depends on it; the filter searches descriptions too, so typing `video` finds the video editor. Nothing is preselected, and an itemized confirmation comes before removal.
 
 Omarchy 4 (Quattro) is supported alongside older installations. Shortcut cleanup removes matching single-line bindings from your personal config and disables packaged defaults in your `bindings.lua`, before your personal overrides. Packaged Omarchy files stay intact. Existing configs receive a unique timestamped backup before edits, and shortcuts are cleaned only after the associated removal succeeds. Multiline/computed Lua bindings and ambiguous long-string layouts are left for manual editing.
 
@@ -24,7 +24,7 @@ Packages are removed in one `pacman -Rns` transaction, including unused dependen
 
 ## Customization
 
-Edit `DEFAULT_APPS`, `DEFAULT_WEBAPPS`, `DEFAULT_TUIS`, and `DEFAULT_NPM_CLIS` in the script to customize the offering. The active package list covers Omarchy's own removable defaults, with additional applications and detected leftovers from older releases. Other default packages remain as commented entries you can uncomment.
+Edit `DEFAULT_APPS`, `DEFAULT_WEBAPPS`, `DEFAULT_TUIS`, and `DEFAULT_NPM_CLIS` in the script to customize the offering. Descriptions live in `item_description`; an uncommented package without one shows pacman's own description. The active package list covers Omarchy's own removable defaults, with additional applications and detected leftovers from older releases. Other default packages remain as commented entries you can uncomment.
 
 ## Upstream sources
 

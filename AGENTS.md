@@ -45,6 +45,9 @@ parse_sections          Splits a combined "items + --webapps-- + --npmclis--"
 webapp_domains_for      Maps a webapp name -> URL domain(s) that identify it.
 app_tokens_for          Maps a package -> the token(s) its keybind references
                         (1password-beta -> 1password; docker* -> docker lazydocker).
+item_description        One-line blurb per item shown in the selector and the
+                        final confirmation; packages without one fall back to
+                        pacman's Description field.
 find_bindings_in_file   Matches supported single-line Lua/conf bindings; can
                         return line numbers so identical comment text survives.
 find_app_bindings       Matches the user's bindings file.
@@ -56,7 +59,8 @@ cleanup_bindings        Creates a checked, unique backup and atomic replacement;
 
 enhanced_select_packages   The gum fuzzy multi-select. Items arrive in one array
                         split by "--webapps--"/"--npmclis--" sentinels; prefixed
-                        📦/🌐/⬢ and marked ⌨ if they have a keybind. Sets globals
+                        📦/🌐/⬢, marked ⌨ if they have a keybind, and followed by
+                        an aligned description. Sets globals
                         SELECTED_PACKAGES / SELECTED_WEBAPPS / SELECTED_NPMCLIS
                         (newline-delimited, to survive names with spaces).
 remove_webapps          Removes one selected webapp/TUI launcher with its helper;
@@ -216,6 +220,10 @@ working machine.
   mapping in `cli_packages_for` and verify the full upstream wrapper template.
   A webapp that's added also needs a `webapp_domains_for` entry for binding cleanup to
   find it.
+- Every offered item needs an `item_description` entry: a short blurb (about 45
+  characters) saying what it is, and which Omarchy feature stops working without
+  it (e.g. chromium runs webapps). A test fails when one is missing. Selector
+  rows are matched exactly, so keep blurbs free of newlines.
 
 ## Agent behaviour
 

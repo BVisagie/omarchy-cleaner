@@ -375,8 +375,20 @@ class CleanerTests(unittest.TestCase):
         self.desktop('Google Photos')
         output = self.run_bash('enhanced_select_packages opencode --webapps-- "Google Photos" --npmclis-- opencode; '
                                'printf "RESULT<%s>|<%s>|<%s>\\n" "$SELECTED_PACKAGES" "$SELECTED_WEBAPPS" "$SELECTED_NPMCLIS"',
-                               FILTER_SELECTION='🌐 Google Photos ⌨\n⬢ opencode')
+                               FILTER_SELECTION="🌐 Google Photos ⌨  Google's photo library and backup\n"
+                                                '⬢  opencode         Open source AI coding agent')
         self.assertIn('RESULT<>|<Google Photos>|<opencode>', output)
+
+    def test_every_catalogue_item_is_described(self):
+        output = self.run_bash('for a in "${DEFAULT_APPS[@]}"; do [[ -n "$(item_description package "$a")" ]] || echo "MISSING package $a"; done; '
+                               'for w in "${DEFAULT_WEBAPPS[@]}" "${DEFAULT_TUIS[@]}"; do [[ -n "$(item_description webapp "$w")" ]] || echo "MISSING webapp $w"; done; '
+                               'for c in "${DEFAULT_NPM_CLIS[@]}"; do [[ -n "$(item_description npmcli "$c")" ]] || echo "MISSING npmcli $c"; done')
+        self.assertNotIn('MISSING', output)
+
+    def test_uncatalogued_package_uses_pacman_description(self):
+        output = self.run_bash('pacman() { printf "Name            : fzf\\nDescription     : Command-line fuzzy finder\\n"; }; '
+                               'item_description package fzf; item_description webapp Unknown')
+        self.assertEqual(output, 'Command-line fuzzy finder\n\n')
 
     def test_parse_sections_handles_empty_and_space_names(self):
         output = self.run_bash('parse_sections --webapps-- "Google Photos" --npmclis-- codex; '
@@ -385,7 +397,10 @@ class CleanerTests(unittest.TestCase):
 
     def test_final_confirmation_cancellation_has_no_mutations(self):
         self.packaged.unlink()
-        self.run_bash('main', INSTALLED_PACKAGES='opencode', FILTER_SELECTION='📦 opencode')
+        output = self.run_bash('main', INSTALLED_PACKAGES='opencode',
+                               FILTER_SELECTION='📦 opencode    Open source AI coding agent')
+        self.assertIn('CONFIRMATION REQUIRED', output)
+        self.assertIn('• opencode — Open source AI coding agent', output)
         self.assertFalse(self.calls('sudo'))
         self.assertTrue(all(call[1] == '-Qi' for call in self.calls('pacman')))
         self.assertEqual(self.bindings.read_text(), '')
