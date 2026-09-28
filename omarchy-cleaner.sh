@@ -1204,9 +1204,10 @@ remove_npm_clis() {
     for cli in "$@"; do
         ((current++))
         gum style --foreground 51 "[$current/$#] Processing CLI wrapper: $cli"
+        # No spinner: rm finishes before gum reads the terminal's replies to its
+        # capability queries, which then print as ^[[?2026;2$y.
         if is_npm_cli_installed "$cli" &&
-            gum spin --spinner dot --show-error --title "Removing $cli wrapper..." -- \
-                rm -f -- "$HOME/.local/bin/$cli" &&
+            rm -f -- "$HOME/.local/bin/$cli" &&
             [[ ! -e "$HOME/.local/bin/$cli" && ! -L "$HOME/.local/bin/$cli" ]]; then
             REMOVED_NPMCLIS+=("$cli")
             gum log --level info "✓ Removed CLI wrapper: $cli"
